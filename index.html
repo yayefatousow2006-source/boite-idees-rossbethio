@@ -721,41 +721,86 @@
         }
 
         async function toggleRecording() {
-            if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        document.getElementById('audioElement').src = audioUrl;
-                        document.getElementById('audioPlayer').classList.remove('hidden');
-                        document.getElementById('recordBtn').style.display = 'none';
-                        stream.getTracks().forEach(track => track.stop());
-                    };
-
-                    mediaRecorder.start();
-                    isRecording = true;
-                    
-                    const recordBtn = document.getElementById('recordBtn');
-                    recordBtn.classList.remove('start');
-                    recordBtn.classList.add('stop');
-                    document.getElementById('recordText').textContent = translations[currentLang].recordStop;
-                } catch (error) {
-                    alert('Erreur: Impossible d\'accéder au microphone.');
+    if (!isRecording) {
+        try {
+            // Vérifier si on est sur iOS (Safari)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
                 }
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
+            });
+            
+            // Utiliser le bon format selon le navigateur
+            let options = { mimeType: 'audio/webm' };
+            
+            if (isIOS || !MediaRecorder.isTypeSupported('audio/webm')) {
+                // Pour iOS et navigateurs qui ne supportent pas webm
+                if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options = { mimeType: 'audio/mp4' };
+                } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                    options = { mimeType: 'audio/wav' };
+                } else {
+                    options = {}; // Laisser le navigateur choisir
+                }
             }
-        }
+            
+            mediaRecorder = new MediaRecorder(stream, options);
+            audioChunks = [];
 
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                audioBlob = new Blob(audioChunks, { type: mimeType });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                document.getElementById('audioElement').src = audioUrl;
+                document.getElementById('audioPlayer').classList.remove('hidden');
+                document.getElementById('recordBtn').style.display = 'none';
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            const recordBtn = document.getElementById('recordBtn');
+            recordBtn.classList.remove('start');
+            recordBtn.classList.add('stop');
+            document.getElementById('recordText').textContent = translations[currentLang].recordStop;
+            
+        } catch (error) {
+            console.error('Erreur microphone:', error);
+            
+            let errorMessage = 'Erreur: Impossible d\'accéder au microphone.\n\n';
+            
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                errorMessage += 'Vous devez autoriser l\'accès au microphone dans les paramètres de votre navigateur.';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage += 'Aucun microphone n\'a été détecté sur votre appareil.';
+            } else if (error.name === 'NotReadableError') {
+                errorMessage += 'Le microphone est peut-être utilisé par une autre application.';
+            } else {
+                errorMessage += 'Veuillez vérifier les permissions de votre navigateur.\n\nSur iPhone/iPad: Réglages > Safari > Microphone\nSur Android: Paramètres > Applications > Navigateur > Autorisations';
+            }
+            
+            alert(errorMessage);
+        }
+    } else {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            isRecording = false;
+        }
+    }
+}
+
+        
         function deleteAudio() {
             audioBlob = null;
             document.getElementById('audioPlayer').classList.add('hidden');
@@ -905,4 +950,5 @@
     </script>
 </body>
 </html>
+
 
