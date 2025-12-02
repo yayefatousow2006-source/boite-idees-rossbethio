@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Boîte à Idées - Centre de Santé Ross Béthio</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -30,14 +35,16 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px;
+            padding: 30px 20px;
             text-align: center;
             position: relative;
+            padding-top: 80px;
         }
 
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
+            padding-right: 10px;
         }
 
         .header p {
@@ -47,9 +54,9 @@
 
         .staff-access-btn {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
+            top: 15px;
+            right: 15px;
+            padding: 8px 15px;
             background: rgba(255,255,255,0.2);
             border: 2px solid white;
             color: white;
@@ -57,6 +64,8 @@
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
+            font-size: 0.85em;
+            z-index: 10;
         }
 
         .staff-access-btn:hover {
@@ -91,31 +100,6 @@
         .form-container {
             padding: 40px;
         }
-
-
-        @media (max-width: 600px) {
-    .header {
-        padding-top: 80px;
-    }
-    
-    .header h1 {
-        font-size: 2em;
-        margin-top: 15px;
-    }
-    
-    .staff-access-btn {
-        font-size: 0.75em;
-        padding: 6px 12px;
-        top: 10px;
-        right: 10px;
-    }
-}
-
-
-
-
-
-        
 
         .form-group {
             margin-bottom: 25px;
@@ -305,7 +289,6 @@
             gap: 15px;
         }
 
-        /* STAFF LOGIN & DASHBOARD */
         .login-container {
             padding: 60px 40px;
             text-align: center;
@@ -480,12 +463,24 @@
             .grid-2 {
                 grid-template-columns: 1fr;
             }
+            .header {
+                padding-top: 80px;
+            }
+            .header h1 {
+                font-size: 2em;
+                margin-top: 15px;
+            }
+            .staff-access-btn {
+                font-size: 0.75em;
+                padding: 6px 12px;
+                top: 10px;
+                right: 10px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- HEADER -->
         <div class="header">
             <button class="staff-access-btn" onclick="showStaffLogin()">🔐 Accès Personnel</button>
             <h1 id="title">Boîte à Idées</h1>
@@ -498,7 +493,6 @@
             </div>
         </div>
 
-        <!-- PATIENT FORM -->
         <div class="form-container" id="formContainer">
             <div class="form-group">
                 <label id="typeLabel">Type de retour *</label>
@@ -559,14 +553,12 @@
             </button>
         </div>
 
-        <!-- SUCCESS MESSAGE -->
         <div class="success-message" id="successMessage">
             <div class="success-icon">✅</div>
             <h2 id="thankYouText">Merci !</h2>
             <p id="confirmationText">Votre message a été reçu par le Centre de Santé de Ross Béthio.</p>
         </div>
 
-        <!-- STAFF LOGIN -->
         <div class="login-container hidden" id="loginContainer">
             <h2>Connexion Personnel</h2>
             <div class="login-form">
@@ -579,7 +571,6 @@
             </div>
         </div>
 
-        <!-- STAFF DASHBOARD -->
         <div class="dashboard hidden" id="dashboard">
             <div class="dashboard-header">
                 <h2>Tableau de Bord Personnel</h2>
@@ -614,6 +605,26 @@
     </div>
 
     <script>
+        // ============================================
+        // CONFIGURATION FIREBASE
+        // ============================================
+        // COLLEZ VOTRE CONFIGURATION FIREBASE ICI (remplacez les lignes ci-dessous)
+       const firebaseConfig = {
+  apiKey: "AIzaSyDDUbS9jbCBznvaX-WWPtfauh6DH7LvqPY",
+  authDomain: "boite-idees-rossbethio.firebaseapp.com",
+  projectId: "boite-idees-rossbethio",
+  storageBucket: "boite-idees-rossbethio.firebasestorage.app",
+  messagingSenderId: "710734437326",
+  appId: "1:710734437326:web:4828d70c53d8e01c0be99f"
+};
+
+        // Initialiser Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
         let currentLang = 'fr';
         let selectedType = 'suggestion';
         let mediaRecorder;
@@ -621,19 +632,7 @@
         let audioBlob;
         let isRecording = false;
 
-
-
-// MOTS DE PASS
-
-
-        const STAFF_PASSWORD = 'rossbethio2024'; // Changez ce mot de passe !
-
-
-
-
-
-
-
+        const STAFF_PASSWORD = 'rossbethio2024';
 
         const translations = {
             fr: {
@@ -721,86 +720,71 @@
         }
 
         async function toggleRecording() {
-    if (!isRecording) {
-        try {
-            // Vérifier si on est sur iOS (Safari)
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 44100
-                }
-            });
-            
-            // Utiliser le bon format selon le navigateur
-            let options = { mimeType: 'audio/webm' };
-            
-            if (isIOS || !MediaRecorder.isTypeSupported('audio/webm')) {
-                // Pour iOS et navigateurs qui ne supportent pas webm
-                if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    options = { mimeType: 'audio/mp4' };
-                } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-                    options = { mimeType: 'audio/wav' };
-                } else {
-                    options = {}; // Laisser le navigateur choisir
-                }
-            }
-            
-            mediaRecorder = new MediaRecorder(stream, options);
-            audioChunks = [];
+            if (!isRecording) {
+                try {
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
+                    });
+                    
+                    let options = { mimeType: 'audio/webm' };
+                    if (isIOS || !MediaRecorder.isTypeSupported('audio/webm')) {
+                        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                            options = { mimeType: 'audio/mp4' };
+                        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                            options = { mimeType: 'audio/wav' };
+                        } else {
+                            options = {};
+                        }
+                    }
+                    
+                    mediaRecorder = new MediaRecorder(stream, options);
+                    audioChunks = [];
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                        audioBlob = new Blob(audioChunks, { type: mimeType });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        document.getElementById('audioElement').src = audioUrl;
+                        document.getElementById('audioPlayer').classList.remove('hidden');
+                        document.getElementById('recordBtn').style.display = 'none';
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    const recordBtn = document.getElementById('recordBtn');
+                    recordBtn.classList.remove('start');
+                    recordBtn.classList.add('stop');
+                    document.getElementById('recordText').textContent = translations[currentLang].recordStop;
+                    
+                } catch (error) {
+                    console.error('Erreur microphone:', error);
+                    let errorMessage = 'Erreur: Impossible d\'accéder au microphone.\n\n';
+                    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                        errorMessage += 'Vous devez autoriser l\'accès au microphone.';
+                    }
+                    alert(errorMessage);
                 }
-            };
-
-            mediaRecorder.onstop = () => {
-                const mimeType = mediaRecorder.mimeType || 'audio/webm';
-                audioBlob = new Blob(audioChunks, { type: mimeType });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                document.getElementById('audioElement').src = audioUrl;
-                document.getElementById('audioPlayer').classList.remove('hidden');
-                document.getElementById('recordBtn').style.display = 'none';
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            mediaRecorder.start();
-            isRecording = true;
-            
-            const recordBtn = document.getElementById('recordBtn');
-            recordBtn.classList.remove('start');
-            recordBtn.classList.add('stop');
-            document.getElementById('recordText').textContent = translations[currentLang].recordStop;
-            
-        } catch (error) {
-            console.error('Erreur microphone:', error);
-            
-            let errorMessage = 'Erreur: Impossible d\'accéder au microphone.\n\n';
-            
-            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                errorMessage += 'Vous devez autoriser l\'accès au microphone dans les paramètres de votre navigateur.';
-            } else if (error.name === 'NotFoundError') {
-                errorMessage += 'Aucun microphone n\'a été détecté sur votre appareil.';
-            } else if (error.name === 'NotReadableError') {
-                errorMessage += 'Le microphone est peut-être utilisé par une autre application.';
             } else {
-                errorMessage += 'Veuillez vérifier les permissions de votre navigateur.\n\nSur iPhone/iPad: Réglages > Safari > Microphone\nSur Android: Paramètres > Applications > Navigateur > Autorisations';
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                }
             }
-            
-            alert(errorMessage);
         }
-    } else {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
-            isRecording = false;
-        }
-    }
-}
 
-        
         function deleteAudio() {
             audioBlob = null;
             document.getElementById('audioPlayer').classList.add('hidden');
@@ -822,8 +806,8 @@
                 return;
             }
 
-            const reader = new FileReader();
             if (audioBlob) {
+                const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = () => {
                     saveSubmission(message, nom, telephone, isAnonymous, reader.result);
@@ -833,29 +817,29 @@
             }
         }
 
-        function saveSubmission(message, nom, telephone, isAnonymous, audioData) {
-            const submission = {
-                id: Date.now(),
-                type: selectedType,
-                message: message,
-                nom: isAnonymous ? 'Anonyme' : nom || 'Anonyme',
-                telephone: isAnonymous ? '' : telephone,
-                hasAudio: !!audioData,
-                audioData: audioData,
-                date: new Date().toISOString(),
-                language: currentLang
-            };
+        async function saveSubmission(message, nom, telephone, isAnonymous, audioData) {
+            try {
+                await db.collection('submissions').add({
+                    type: selectedType,
+                    message: message,
+                    nom: isAnonymous ? 'Anonyme' : nom || 'Anonyme',
+                    telephone: isAnonymous ? '' : telephone,
+                    hasAudio: !!audioData,
+                    audioData: audioData,
+                    date: firebase.firestore.FieldValue.serverTimestamp(),
+                    language: currentLang
+                });
 
-            const submissions = JSON.parse(localStorage.getItem('submissions') || '[]');
-            submissions.push(submission);
-            localStorage.setItem('submissions', JSON.stringify(submissions));
+                document.getElementById('formContainer').style.display = 'none';
+                document.getElementById('successMessage').classList.add('show');
 
-            document.getElementById('formContainer').style.display = 'none';
-            document.getElementById('successMessage').classList.add('show');
-
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors de l\'envoi. Veuillez réessayer.');
+            }
         }
 
         function showStaffLogin() {
@@ -885,70 +869,78 @@
             document.getElementById('staffPassword').value = '';
         }
 
-        function loadDashboard() {
-            const submissions = JSON.parse(localStorage.getItem('submissions') || '[]');
-            
-            const audioMessages = submissions.filter(s => s.hasAudio);
-            const textMessages = submissions.filter(s => s.message && !s.hasAudio);
-            
-            document.getElementById('totalCount').textContent = submissions.length;
-            document.getElementById('audioCount').textContent = audioMessages.length;
-            document.getElementById('textCount').textContent = textMessages.length;
+        async function loadDashboard() {
+            try {
+                const snapshot = await db.collection('submissions').orderBy('date', 'desc').get();
+                const submissions = [];
+                
+                snapshot.forEach(doc => {
+                    submissions.push({ id: doc.id, ...doc.data() });
+                });
 
-            displayMessages('allMessages', submissions);
-            displayMessages('audioMessages', audioMessages);
-            displayMessages('textMessages', textMessages);
+                const audioMessages = submissions.filter(s => s.hasAudio);
+                const textMessages = submissions.filter(s => s.message && !s.hasAudio);
+                
+                document.getElementById('totalCount').textContent = submissions.length;
+                document.getElementById('audioCount').textContent = audioMessages.length;
+                document.getElementById('textCount').textContent = textMessages.length;
+
+                displayMessages('allMessages', submissions);
+                displayMessages('audioMessages', audioMessages);
+                displayMessages('textMessages', textMessages);
+            } catch (error) {
+                console.error('Erreur chargement:', error);
+                alert('Erreur lors du chargement des messages.');
+            }
         }
 
         function displayMessages(containerId, messages) {
-            const container = document.getElementById(containerId);
-            
-            if (messages.length === 0) {
-                container.innerHTML = '<div class="no-messages">Aucun message pour le moment</div>';
-                return;
-            }
+            const container = document.getElementById(
+                if (messages.length === 0) {
+            container.innerHTML = '<div class="no-messages">Aucun message pour le moment</div>';
+            return;
+        }
 
-            container.innerHTML = messages.map(msg => `
-                <div class="message-card">
-                    <div class="message-header">
-                        <span class="message-type type-${msg.type}">
-                            ${msg.type === 'suggestion' ? '💡 Suggestion' : 
-                              msg.type === 'critique' ? '⚠️ Critique' : '📝 Observation'}
-                        </span>
-                        <button class="delete-btn" onclick="deleteMessage(${msg.id})">Supprimer</button>
-                    </div>
-                    <div class="message-meta">
-                        📅 ${new Date(msg.date).toLocaleString('fr-FR')} | 
-                        👤 ${msg.nom} ${msg.telephone ? '| 📞 ' + msg.telephone : ''} |
-                        🌐 ${msg.language === 'wo' ? 'Wolof' : 'Français'}
-                    </div>
-                    ${msg.message ? `<div class="message-content">${msg.message}</div>` : ''}
-                    ${msg.hasAudio ? `<audio controls src="${msg.audioData}" style="width: 100%;"></audio>` : ''}
+        container.innerHTML = messages.map(msg => `
+            <div class="message-card">
+                <div class="message-header">
+                    <span class="message-type type-${msg.type}">
+                        ${msg.type === 'suggestion' ? '💡 Suggestion' : 
+                          msg.type === 'critique' ? '⚠️ Critique' : '📝 Observation'}
+                    </span>
+                    <button class="delete-btn" onclick="deleteMessage('${msg.id}')">Supprimer</button>
                 </div>
-            `).join('');
-        }
+                <div class="message-meta">
+                    📅 ${msg.date ? new Date(msg.date.toDate()).toLocaleString('fr-FR') : 'Date inconnue'} | 
+                    👤 ${msg.nom} ${msg.telephone ? '| 📞 ' + msg.telephone : ''} |
+                    🌐 ${msg.language === 'wo' ? 'Wolof' : 'Français'}
+                </div>
+                ${msg.message ? `<div class="message-content">${msg.message}</div>` : ''}
+                ${msg.hasAudio ? `<audio controls src="${msg.audioData}" style="width: 100%;"></audio>` : ''}
+            </div>
+        `).join('');
+    }
 
-        function deleteMessage(id) {
-            if (confirm('Supprimer ce message ?')) {
-                let submissions = JSON.parse(localStorage.getItem('submissions') || '[]');
-                submissions = submissions.filter(s => s.id !== id);
-                localStorage.setItem('submissions', JSON.stringify(submissions));
+    async function deleteMessage(id) {
+        if (confirm('Supprimer ce message ?')) {
+            try {
+                await db.collection('submissions').doc(id).delete();
                 loadDashboard();
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                alert('Erreur lors de la suppression.');
             }
         }
+    }
 
-        function showTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.messages-section').forEach(s => s.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            
-            if (tab === 'all') document.getElementById('allMessages').classList.add('active');
-            if (tab === 'audio') document.getElementById('audioMessages').classList.add('active');
-            if (tab === 'text') document.getElementById('textMessages').classList.add('active');
-        }
-    </script>
-</body>
-</html>
-
-
+    function showTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.messages-section').forEach(s => s.classList.remove('active'));
+        
+        event.target.classList.add('active');
+        
+        if (tab === 'all') document.getElementById('allMessages').classList.add('active');
+        if (tab === 'audio') document.getElementById('audioMessages').classList.add('active');
+        if (tab === 'text') document.getElementById('textMessages').classList.add('active');
+    }
+</script>
